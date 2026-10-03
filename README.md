@@ -1,248 +1,309 @@
-# Cloud-to-Cluster — Reproducible HPC Platform Engineering & HPL
+Cloud-to-Cluster — Reproducible Platform Engineering & HPL
+==========================================================
 
-**Repository:** `cloud-hpl-scc26`  
-**Recommended long name:** **Cloud-to-Cluster: Reproducible HPC Platform Engineering & HPL**  
-**Duration:** 10-week core, 12 weeks with stretch/handover
+Welcome. This repository is one of the CHPC student engineering projects for the 2026 SCC follow-on programme. You will spend the first four weeks building the same small cloud-native research platform as the other teams, then use that platform for your team's project-specific experiment.
 
-## Project summary
+The project is intentionally ambitious, but the path is deliberately staged. **Do not try to understand every technology before you begin.** Build one layer, validate it, understand what it owns, then continue.
 
-This project asks students to build a clean, reproducible path from an empty OpenStack project to a working Kubernetes-hosted High Performance LINPACK (HPL) demonstration, while preserving the architectural separation between infrastructure, Kubernetes services and HPC scheduling.
+> [!IMPORTANT]
+> The objective is not to copy commands until something turns green. By the end, every team member should be able to explain the full platform at a useful high level, even though each person has a primary role.
 
-HPL is the proof point, not the whole project. The real learning objective is to understand the chain:
+# Project question
 
-```text
-OpenStack -> Terraform -> Ansible -> Kubernetes -> Cilium/Cinder -> Argo CD
-          -> monitoring -> reproducible HPL image/job -> benchmark evidence
-```
+> Can a student team rebuild the platform from code and produce an HPL run whose image, parameters, resource placement and performance evidence are reproducible?
 
-The project should also expose students to Slurm and the larger `quantum-platform`/`quantum-workflows` environment without pretending that Kubernetes replaces Slurm for every HPC workload. A Kubernetes HPL run demonstrates container orchestration and reproducibility; Slurm remains the natural scheduler for production-style multi-node HPC work in the wider architecture.
+# Start here
 
-## Core question
+Work through the common platform weeks in order:
 
-> Can a student team rebuild the baseline platform from code and produce an HPL result whose software stack, resource placement, parameters and performance evidence are completely reproducible?
+1. [Week 1 — OpenStack → Terraform → Ansible](week1/README.md)
+2. [Week 2 — Kubernetes Substrate & GitOps](week2/README.md)
+3. [Week 3 — Observability, Security & Quantum Platform](week3/README.md)
+4. [Week 4 — Agent Control Plane & Hermes](week4/README.md)
+5. **Week 5 — project-specific implementation**
+6. **Week 6 — technical journal article, poster and reproducibility rebuild**
+7. **Week 7 — consolidation, cleanup and upstream handover**
 
-## Primary integrations
+The upstream implementation/reference repositories are:
 
-- `infra-hpc-qc-k8s` — primary infrastructure and GitOps integration target;
-- `quantum-platform` — optional status/result surface and authenticated launch request;
-- `quantum-workflows` — provenance conventions, immutable runner concepts and future workload interface;
-- `agent-control-plane` — read-only diagnostic evidence as a stretch integration;
-- `chpc-tech-eval/scc` — HPL and cluster-engineering learning lineage.
+- [`nyameko/infra-hpc-qc-k8s`](https://github.com/nyameko/infra-hpc-qc-k8s) — OpenStack/Terraform, Ansible, Kubernetes, GitOps, storage, observability and security deployment;
+- [`nyameko/quantum-platform`](https://github.com/nyameko/quantum-platform) — Astro/Django/PostgreSQL user-facing platform;
+- [`nyameko/agent-control-plane`](https://github.com/nyameko/agent-control-plane) — bounded agent task API, persistent history and Hermes worker;
+- [`chpc-tech-eval/scc`](https://github.com/chpc-tech-eval/scc) — teaching/tutorial style and HPC learning lineage.
 
-## Learning outcomes
+These repositories are active. Record the exact commit SHA you use each week. When a tested baseline is announced, keep the whole team on that baseline until instructed otherwise.
 
-Students should be able to:
+# Programme cadence
 
-- explain Terraform, Ansible, Kubernetes, Argo CD and Slurm ownership boundaries;
-- deploy OpenStack resources reproducibly;
-- verify Kubernetes networking, storage and ingress prerequisites;
-- build and publish an immutable HPL runner image;
-- model CPU/memory placement and topology constraints;
-- run HPL as a Kubernetes workload;
-- collect benchmark configuration and performance evidence;
-- compare measured performance with an estimated theoretical peak;
-- diagnose a failed deployment from logs/metrics rather than rebuilding blindly;
-- explain why a result is reproducible or why it is not.
+The current plan is a **six-week core project** followed by **Week 7 consolidation**. Team captains should coordinate the Friday working session, tentatively **14:00–18:00**, through the programme Discord. The current expected infrastructure access window runs through **15 December 2026**; watch GitHub/Discord for any operational changes.
 
-## Scope
+Discord: https://discord.gg/PNMknPydJ
 
-### Must deliver
+# What you will build
 
-1. A documented minimal infrastructure profile that can be deployed in a student OpenStack project.
-2. Terraform plan/apply validation and safe destroy/rebuild procedure.
-3. Ansible configuration for the required hosts.
-4. A working Kubernetes cluster with Cilium and persistent storage where the environment provides it.
-5. Argo CD deployment path for project-owned Kubernetes manifests.
-6. Prometheus/Grafana visibility of nodes/pods used by the HPL run.
-7. A versioned HPL OCI image with pinned build inputs.
-8. A Kubernetes HPL job for a single-node baseline.
-9. Structured benchmark output including commit/image digest, HPL parameters and assigned resources.
-10. A documented comparison against theoretical peak and an explanation of the gap.
+The common platform is approximately:
 
-### Should deliver
+| Role | vCPU | RAM | Storage | Purpose |
+| --- | ---: | ---: | ---: | --- |
+| `edge-01` | 4 | 10 GiB | 50 GiB | WireGuard, Pi-hole/DNS, nftables, Wazuh Manager, Suricata |
+| `api-lb-01` | 2 | 4 GiB | 25 GiB | HAProxy and stable Kubernetes API endpoint |
+| `k8s-cp-01` | 4 | 8 GiB | 30 GiB | Kubernetes control plane |
+| `k8s-worker-01` | 8 | 16 GiB | 40 GiB | platform/workbench/project workloads |
+| `k8s-worker-02` | 8 | 16 GiB | 40 GiB | platform/workbench/project workloads |
+| **POC total** | **26** | **54 GiB** | **185 GiB** | excluding separately allocated GPU systems |
 
-- multi-node MPI HPL on Kubernetes using a reviewed MPI orchestration approach;
-- automated benchmark result ingestion and visualisation;
-- a Slurm HPL comparison using the same or equivalent build inputs;
-- a small `quantum-platform` administrator/researcher page showing run metadata;
-- failure-injection exercise such as unavailable storage, image-pull failure or insufficient resources.
+Your team may adjust the final design within the project quota, but every change needs a technical reason.
 
-### Stretch
-
-- CPU pinning/NUMA/topology experiments;
-- alternative BLAS/MPI implementations;
-- HPL parameter sweep controlled by a reproducible experiment manifest;
-- agent-control-plane read-only diagnostic that explains failed HPL jobs;
-- reusable workload contract aligned with `quantum-workflows` provenance.
-
-## Non-goals
-
-- benchmarking every SCC application;
-- replacing Slurm with Kubernetes;
-- prematurely adding GPU/QPU complexity before the CPU HPL path is solid;
-- hand-configuring a snowflake cluster that cannot be rebuilt;
-- tuning solely for the largest GFLOP/s number while losing provenance.
-
-## Architecture
+## Common architecture
 
 ```text
-Git repository
-    │
-    ├── Terraform ───────> OpenStack network/VMs/volumes/security groups
-    │
-    └── Ansible ─────────> host configuration
-                              │
-                              ▼
-                         Kubernetes
-                              │
-                ┌─────────────┼─────────────┐
-                │             │             │
-             Cilium        Cinder CSI     Argo CD
-                                              │
-                                              ▼
-                                      HPL workload image
-                                              │
-                                     Kubernetes Job/MPI
-                                              │
-                         ┌────────────────────┴─────────────┐
-                         ▼                                  ▼
-                  HPL result/provenance              Prometheus/Grafana
+                              Your workstation
+                                    │
+                                    │ WireGuard / SSH
+                                    ▼
+                              ┌───────────┐
+                              │  edge-01  │
+                              │ VPN / DNS │
+                              │ security  │
+                              └─────┬─────┘
+                                    │
+                  ┌─────────────────┴──────────────────┐
+                  │                                    │
+                  ▼                                    ▼
+            ┌───────────┐                       ┌─────────────┐
+            │ api-lb-01 │                       │ Kubernetes  │
+            │  HAProxy  │                       │   cluster   │
+            └─────┬─────┘                       └──────┬──────┘
+                  │                                    │
+                  │ :6443                       ┌──────┴──────┐
+                  └────────────────────────────►│ k8s-cp-01  │
+                                               └──────┬──────┘
+                                                      │
+                                             ┌────────┴────────┐
+                                             ▼                 ▼
+                                      ┌─────────────┐   ┌─────────────┐
+                                      │k8s-worker-01│   │k8s-worker-02│
+                                      └─────────────┘   └─────────────┘
 ```
 
-## Repository layout
+
+A100 and H200 access is **separate** from the Sebowa OpenStack project. The normal design is for small services/agents in Kubernetes to call approved model endpoints remotely.
+
+# Why the first four weeks are shared
+
+All four projects depend on the same engineering foundations. The common build teaches the control boundaries once:
+
+```text
+Terraform       → OpenStack infrastructure
+Ansible         → Linux host configuration/bootstrap
+kubeadm         → Kubernetes bootstrap
+Cilium          → Kubernetes networking/policy
+Cinder CSI      → Kubernetes persistent block storage
+Argo CD         → long-lived Kubernetes application state
+Sealed Secrets  → encrypted secret material in GitOps
+Traefik         → application ingress
+Prometheus      → metrics collection
+Grafana         → metrics visualisation
+Wazuh           → host/security event evidence
+Suricata        → network IDS evidence
+Quantum Platform→ user identity/product surface
+Agent Control Plane → bounded agent tasks/history/policy
+Hermes          → agent runtime/harness
+A100/H200 model server → inference
+```
+
+If you do not know a term yet, that is expected. The weekly tutorials introduce it when you need it.
+
+# Six-week core + Week 7 consolidation
+
+| Week | Common goal | Exit condition |
+| --- | --- | --- |
+| 1 | OpenStack → Terraform → Ansible | five-node POC reproducibly deployed and bootstrapped |
+| 2 | Kubernetes substrate + GitOps | 1 CP + 2 workers, Cilium, Cinder, Argo, Sealed Secrets, Traefik/TLS |
+| 3 | Observability/security + Quantum Platform | Prometheus/Grafana, Wazuh/Suricata evidence and working browser login |
+| 4 | ACP + Hermes | portal → ACP → evidence → Hermes → remote model round trip |
+| 5 | Project specialisation | project-specific MVP demonstrated on the common platform |
+| 6 | Report + reproducibility | 2-page technical journal article, poster and tear-down/rebuild evidence |
+| 7 | Consolidation | cleanup, final fixes, documented handover and upstream-ready contributions |
+
+### Week 5 — Reproducible Kubernetes HPL
+
+HPL is your proof point, not the whole project. By Week 5 the common platform should already exist; now use it to build and execute a pinned HPL workload.
+
+Target flow:
+
+```text
+source + pinned build inputs
+      ↓
+OCI image
+      ↓
+CI smoke test
+      ↓
+Kubernetes Job
+      ↓
+HPL residual PASS
+      ↓
+run metadata + Prometheus evidence
+      ↓
+parameter / performance analysis
+```
+
+Required Week 5 outcomes:
+
+- versioned OCI HPL image;
+- rudimentary CI build/smoke gate;
+- single-node Kubernetes Job with explicit CPU/memory requests;
+- passing HPL residual check;
+- recorded `N`, `NB`, `P`, `Q`, image digest, Git commit and assigned resources;
+- Prometheus/Grafana evidence for the run window;
+- at least two parameter/resource experiments and an explanation of the difference.
+
+Multi-node MPI, Slurm comparison and deeper NUMA tuning are stretch work after the reproducible baseline is sound.
+
+
+# Week 6 — report, poster and reproducibility
+
+Your final Week 6 assessment is **not** "our environment has been alive for six weeks." You must demonstrate that the project is reproducible.
+
+At minimum:
+
+1. preserve the required state/results and record the exact source/image revisions;
+2. tear down the disposable infrastructure using the documented method;
+3. recreate the common platform from your Terraform/Ansible/GitOps sources and protected environment inputs;
+4. rerun the core acceptance checks;
+5. rerun the project-specific MVP or a representative reproducibility test;
+6. record failures, manual exceptions and time-consuming steps honestly.
+
+You will prepare:
+
+- a **two-page technical journal-style article**;
+- a **project poster**;
+- a short live demonstration;
+- reproducibility evidence.
+
+The article/poster should answer: problem, architecture, method, evidence/results, limitations, lessons learned and future work.
+
+# Week 7 — consolidation
+
+Use the consolidation week to:
+
+- fix documentation discovered to be incomplete during the rebuild;
+- clean secrets/test credentials and stale resources;
+- turn useful project changes into clear commits/PRs;
+- identify improvements that belong upstream in `infra-hpc-qc-k8s`, `quantum-platform` or `agent-control-plane`;
+- freeze final results and architecture diagrams;
+- make the repository understandable to the next student who did not attend your meetings.
+
+# Team roles
+
+There are four students per team. Use the following primary ownership areas to parallelise the work:
+
+| Role | Primary responsibility |
+| --- | --- |
+| **Infrastructure deployment** | OpenStack, Terraform, networking, security groups, DNS/firewall design |
+| **Cloud automation** | Ansible, Kubernetes, Cilium, Cinder |
+| **CI/CD, telemetry & security** | Argo CD, CI, Prometheus/Grafana, Wazuh, Suricata |
+| **Frontend, agents & specialisation** | Astro/Quantum Platform, ACP, Hermes and project-specific implementation |
+
+These are **not silos**. Rotate ownership after major milestones and review one another's work. Any team member may be asked to explain any part of the final architecture.
+
+# Working method
+
+Use the same pattern every week:
+
+```text
+READ
+  ↓
+DESIGN
+  ↓
+DEPLOY
+  ↓
+VERIFY
+  ↓
+BREAK / OBSERVE
+  ↓
+FIX
+  ↓
+DOCUMENT
+  ↓
+COMMIT
+```
+
+A command completing without an error is not proof that the system works. Prefer end-to-end acceptance evidence.
+
+> [!TIP]
+> **Show the working system, not slides about the working system.** Screenshots and diagrams are useful evidence, but they do not replace a live command, request, query or reproducible run.
+
+# Git workflow
+
+Keep changes small and reviewable. A simple student flow is:
+
+```text
+feature/<short-topic>
+        ↓ Pull Request
+      main
+```
+
+Use issues for tasks/bugs and pull requests for reviewed changes. Do not store secrets in issue comments, Discord, screenshots or Git history.
+
+Before pushing:
+
+```bash
+git status
+git diff --cached
+```
+
+Commit messages should say what changed and why.
+
+# Secrets and safety
+
+Never commit:
+
+- OpenStack credentials/application-credential secrets;
+- private SSH or WireGuard keys;
+- kubeconfigs;
+- plaintext Kubernetes Secrets;
+- database passwords;
+- model API keys;
+- Discord bot tokens;
+- TLS private keys.
+
+Use the approved private-variable/Vault/Sealed Secret workflow described in the weekly guides.
+
+A useful project layout after the common deployment is:
 
 ```text
 cloud-hpl-scc26/
 ├── README.md
-├── docs/
-│   ├── ARCHITECTURE.md
-│   ├── DEPLOYMENT.md
-│   ├── HPL-METHODOLOGY.md
-│   └── TROUBLESHOOTING.md
-├── image/
-│   └── hpl/
+├── week1/ ... week4/
+├── image/hpl/
 ├── k8s/
-│   ├── base/
-│   └── overlays/
 ├── experiments/
-│   ├── baseline/
-│   └── schemas/
-├── scripts/
+├── results/
 ├── tests/
-└── .github/workflows/
+└── reports/
 ```
 
-Infrastructure that clearly belongs in `infra-hpc-qc-k8s` should be upstreamed rather than permanently copied here. This project repository owns the student experiment, validation harness and HPL integration work.
+Every result should identify the source commit, immutable image digest, HPL parameters and assigned resources.
 
-## HPL evidence contract
 
-Every recorded run should capture at least:
+# Final project deliverable
 
-```yaml
-run_id: <uuid-or-timestamp>
-git_commit: <commit>
-image_digest: <immutable-image-digest>
-kubernetes_context: <redacted-logical-name>
-node_count: 1
-cpu_request: <value>
-memory_request: <value>
-hpl:
-  N: <value>
-  NB: <value>
-  P: <value>
-  Q: <value>
-software:
-  hpl: <version>
-  blas: <implementation/version>
-  mpi: <implementation/version>
-result:
-  time_seconds: <value>
-  gflops: <value>
-  residual_check: PASS|FAIL
+A pinned HPL OCI image and reproducible Kubernetes Job with a passing residual, recorded provenance, resource telemetry and a short performance analysis.
+
+# Getting help
+
+Use your project repository for technical issues and decisions, and the programme Discord for collaborative teaching/discussion. When asking for help, include:
+
+```text
+what you expected
+what actually happened
+the exact command/request
+relevant error/log excerpt
+which layer you already checked
+source commit(s) in use
 ```
 
-Do not store cloud credentials, kubeconfigs or private infrastructure secrets in benchmark artifacts.
+Redact credentials and private infrastructure values.
 
-## Ten-week roadmap
-
-### Week 1 — Architecture and manual baseline
-
-- reproduce the relevant SCC HPL learning path manually;
-- map every manual action to its eventual automation owner;
-- define minimal OpenStack resource requirements;
-- estimate theoretical peak for the selected VM resources.
-
-**Exit:** HPL runs manually on one host and students can explain every dependency.
-
-### Week 2 — Infrastructure as code
-
-- Terraform deploy/destroy;
-- Ansible connectivity and baseline configuration;
-- smoke tests for network, DNS, time and package prerequisites.
-
-**Exit:** clean rebuild of the minimal environment.
-
-### Week 3 — Kubernetes baseline
-
-- control plane/workers healthy;
-- Cilium validation;
-- storage validation where required;
-- Argo CD ready;
-- node/pod telemetry visible.
-
-### Week 4 — Immutable HPL runner
-
-- container build;
-- pinned HPL/BLAS/MPI inputs;
-- CI smoke test;
-- image digest recorded.
-
-**Exit:** local/container HPL residual test passes.
-
-### Week 5 — Kubernetes HPL
-
-- deploy single-node HPL Job;
-- collect logs/results automatically;
-- show node placement and resource requests;
-- correlate result with Prometheus telemetry.
-
-**Exit:** reproducible Kubernetes HPL result.
-
-### Week 6 — Performance methodology
-
-- parameter study for `N`, `NB`, process grid and CPU allocation;
-- compare against theoretical peak;
-- explain CPU, memory and virtualisation constraints.
-
-### Week 7 — Multi-node or Slurm comparison
-
-Preferred path: multi-node MPI on Kubernetes. If infrastructure limits make that impractical, perform a rigorous Slurm comparison using the same methodology.
-
-**Exit:** second scheduler/execution path with comparable provenance.
-
-### Week 8 — Failure and recovery
-
-Intentionally break one component at a time: image reference, resource request, networking, storage or application parameters. Write troubleshooting trees and automate checks.
-
-### Week 9 — Staging release
-
-Deploy from `stag`, run the full conformance suite and benchmark matrix, freeze results and resolve reproducibility defects.
-
-### Week 10 — Final demo
-
-Start from documented prerequisites, deploy, run HPL, show metrics, explain theoretical vs measured performance, demonstrate one failure diagnosis and release `main`.
-
-### Weeks 11–12 — Stretch
-
-NUMA/topology tuning, multi-node MPI hardening, UI integration and upstream PRs.
-
-## Acceptance criteria
-
-The project passes when another student can follow the documentation from a clean supported starting point, produce a passing HPL residual check in Kubernetes, identify the exact image and source commit that ran, reproduce the HPL input parameters, and explain the measured performance using system telemetry.
-
-## Upstream contribution targets
-
-- `infra-hpc-qc-k8s`: validated deployment improvements, Argo application definitions, monitoring checks, optional HPL teaching workload;
-- `quantum-platform`: optional workload/run summary UI;
-- `quantum-workflows`: reusable provenance/result schema ideas;
-- `chpc-tech-eval/scc`: modern HPL/IaC tutorial improvements proven by the student project.
+Most importantly: **Keep Calm and Carry On.** The purpose is to learn how the layers fit together, not to already know them on day one.
