@@ -72,3 +72,15 @@ Record failed runs with:
 - exact configuration used.
 
 Deleting failed runs destroys useful engineering evidence.
+
+## Week 3 — Observability Results
+
+Status: Part A verified.
+
+- Prometheus: 20 scrape targets UP, 6 DOWN.
+- Grafana: Cluster Overview dashboard provisioned and displaying live data.
+- Metrics: CPU and memory usage visible for three nodes.
+- Storage: Prometheus (10 GiB) and Grafana (5 GiB) PVCs bound.
+- Dashboard provisioning: Git-managed JSON dashboard loaded successfully.
+- Limitation: kube-controller-manager, kube-etcd, kube-scheduler and three kube-proxy metrics targets refuse connections on their configured node addresses. Their metrics endpoints listen on loopback; they were not exposed externally.
+- Security: No credentials or passwords recorded.

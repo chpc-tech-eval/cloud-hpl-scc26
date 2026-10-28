@@ -1,0 +1,52 @@
+---
+- name: Install and configure Wazuh agents
+  hosts: kubernetes
+  become: true
+
+  vars:
+    wazuh_manager_address: "10.83.0.110"
+
+  tasks:
+    - name: Add Wazuh repository
+      ansible.builtin.yum_repository:
+        name: wazuh
+        description: Wazuh repository
+        baseurl: https://packages.wazuh.com/4.x/yum/
+        enabled: true
+        gpgcheck: true
+        gpgkey: https://packages.wazuh.com/key/GPG-KEY-WAZUH
+        priority: 1
+
+    - name: Install Wazuh agent
+      ansible.builtin.dnf:
+        name: wazuh-agent
+        state: present
+        update_cache: true
+
+    - name: Configure Wazuh Manager address
+      ansible.builtin.lineinfile:
+        path: /var/ossec/etc/ossec.conf
+        regexp: '(<address>).*?(</address>)'
+        line: '      <address>{{ wazuh_manager_address }}</address>'
+        insertafter: '<server>'
+        backup: true
+      notify: Restart Wazuh agent
+
+    - name: Set Wazuh agent name
+      ansible.builtin.replace:
+        path: /var/ossec/etc/ossec.conf
+        regexp: '<agent_name>.*?</agent_name>'
+        replace: '<agent_name>{{ inventory_hostname }}</agent_name>'
+      notify: Restart Wazuh agent
+
+    - name: Enable and start Wazuh agent
+      ansible.builtin.systemd:
+        name: wazuh-agent
+        enabled: true
+        state: started
+
+  handlers:
+    - name: Restart Wazuh agent
+      ansible.builtin.systemd:
+        name: wazuh-agent
+        state: restarted

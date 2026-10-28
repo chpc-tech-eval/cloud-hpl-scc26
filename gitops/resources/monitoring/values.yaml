@@ -1,0 +1,138 @@
+prometheus:
+  prometheusSpec:
+    retention: 7d
+    replicas: 1
+    resources:
+      requests:
+        cpu: 250m
+        memory: 512Mi
+      limits:
+        memory: 2Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: csi-cinder-sc-retain
+          accessModes:
+            - ReadWriteOnce
+          resources:
+            requests:
+              storage: 10Gi
+
+grafana:
+  replicas: 1
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 1Gi
+
+  persistence:
+    enabled: true
+    type: pvc
+    storageClassName: csi-cinder-sc-retain
+    accessModes:
+      - ReadWriteOnce
+    size: 5Gi
+
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+
+  sidecar:
+    dashboards:
+      enabled: true
+      label: dashboard-provider
+      labelValue: default
+      searchNamespace: ALL
+
+  dashboards:
+    default:
+      cluster-overview:
+        json: |
+          {
+            "title": "Cluster Overview",
+            "uid": "cluster-overview",
+            "schemaVersion": 39,
+            "version": 1,
+            "refresh": "30s",
+            "panels": [
+              {
+                "id": 1,
+                "title": "Healthy Targets",
+                "type": "stat",
+                "gridPos": {
+                  "h": 5,
+                  "w": 6,
+                  "x": 0,
+                  "y": 0
+                },
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "prometheus"
+                },
+                "targets": [
+                  {
+                    "expr": "sum(up)",
+                    "legendFormat": "Up",
+                    "refId": "A"
+                  }
+                ]
+              },
+              {
+                "id": 2,
+                "title": "CPU Usage by Node (%)",
+                "type": "timeseries",
+                "gridPos": {
+                  "h": 8,
+                  "w": 12,
+                  "x": 6,
+                  "y": 0
+                },
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "prometheus"
+                },
+                "targets": [
+                  {
+                    "expr": "100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])))",
+                    "legendFormat": "{{instance}}",
+                    "refId": "A"
+                  }
+                ]
+              },
+              {
+                "id": 3,
+                "title": "Memory Usage by Node (%)",
+                "type": "timeseries",
+                "gridPos": {
+                  "h": 8,
+                  "w": 12,
+                  "x": 0,
+                  "y": 8
+                },
+                "datasource": {
+                  "type": "prometheus",
+                  "uid": "prometheus"
+                },
+                "targets": [
+                  {
+                    "expr": "100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)",
+                    "legendFormat": "{{instance}}",
+                    "refId": "A"
+                  }
+                ]
+              }
+            ]
+          }
+
+alertmanager:
+  enabled: false
+
+prometheus-node-exporter:
+  enabled: true
+
+kube-state-metrics:
+  enabled: true

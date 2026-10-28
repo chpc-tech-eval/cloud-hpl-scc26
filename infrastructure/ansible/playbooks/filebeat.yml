@@ -1,0 +1,169 @@
+---
+- name: Configure Filebeat for Wazuh alerts
+  hosts: edge
+  become: true
+
+  vars:
+    wazuh_version: "4.14.9"
+    wazuh_indexer_host: "indexer.wazuh.svc"
+    wazuh_indexer_ip: "10.83.0.68"
+    wazuh_indexer_port: 30200
+    wazuh_indexer_user: "kibanaserver"
+    wazuh_indexer_password: "{{ lookup('env', 'WAZUH_INDEXER_PASSWORD') }}"
+    wazuh_indexer_ca_path: /etc/filebeat/certs/root-ca.pem
+    wazuh_filebeat_module_url: "https://packages.wazuh.com/4.x/filebeat/wazuh-filebeat-0.5.tar.gz"
+    wazuh_template_url: "https://raw.githubusercontent.com/wazuh/wazuh/v{{ wazuh_version }}/extensions/elasticsearch/7.x/wazuh-template.json"
+
+  pre_tasks:
+    - name: Require the indexer password from the workstation environment
+      ansible.builtin.assert:
+        that:
+          - wazuh_indexer_password | length > 0
+        fail_msg: "Export WAZUH_INDEXER_PASSWORD on the workstation before running this playbook."
+
+  tasks:
+    - name: Import Wazuh repository signing key
+      ansible.builtin.rpm_key:
+        state: present
+        key: https://packages.wazuh.com/key/GPG-KEY-WAZUH
+
+    - name: Configure Wazuh package repository
+      ansible.builtin.yum_repository:
+        name: wazuh
+        description: Wazuh repository
+        baseurl: https://packages.wazuh.com/4.x/yum/
+        gpgcheck: true
+        gpgkey: https://packages.wazuh.com/key/GPG-KEY-WAZUH
+        enabled: true
+        priority: 1
+
+    - name: Install Filebeat if missing
+      ansible.builtin.dnf:
+        name: filebeat
+        state: present
+
+    - name: Ensure Filebeat certificate directory exists
+      ansible.builtin.file:
+        path: /etc/filebeat/certs
+        state: directory
+        owner: root
+        group: root
+        mode: "0750"
+
+    - name: Install indexer root CA certificate
+      ansible.builtin.copy:
+        src: "{{ playbook_dir }}/../files/wazuh-indexer-root-ca.crt"
+        dest: "{{ wazuh_indexer_ca_path }}"
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart Filebeat
+
+    - name: Add indexer hostname for TLS verification
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        line: "{{ wazuh_indexer_ip }} {{ wazuh_indexer_host }}"
+        state: present
+
+    - name: Download Wazuh Filebeat module archive
+      ansible.builtin.get_url:
+        url: "{{ wazuh_filebeat_module_url }}"
+        dest: /tmp/wazuh-filebeat-0.5.tar.gz
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Install Wazuh Filebeat module
+      ansible.builtin.unarchive:
+        src: /tmp/wazuh-filebeat-0.5.tar.gz
+        dest: /usr/share/filebeat/module
+        remote_src: true
+        creates: /usr/share/filebeat/module/wazuh/alerts/manifest.yml
+      notify: Restart Filebeat
+
+    - name: Install Wazuh index template
+      ansible.builtin.get_url:
+        url: "{{ wazuh_template_url }}"
+        dest: /etc/filebeat/wazuh-template.json
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart Filebeat
+
+    - name: Configure Wazuh alerts module
+      ansible.builtin.blockinfile:
+        path: /etc/filebeat/filebeat.yml
+        marker: "# {mark} ANSIBLE WAZUH CONFIG"
+        block: |
+          filebeat.modules:
+            - module: wazuh
+              alerts:
+                enabled: true
+              archives:
+                enabled: false
+        backup: true
+      notify: Restart Filebeat
+
+    - name: Configure Wazuh template and disable ILM
+      ansible.builtin.blockinfile:
+        path: /etc/filebeat/filebeat.yml
+        marker: "# {mark} ANSIBLE WAZUH TEMPLATE CONFIG"
+        insertafter: EOF
+        block: |
+          setup.template.json.enabled: true
+          setup.template.json.path: /etc/filebeat/wazuh-template.json
+          setup.template.json.name: wazuh
+          setup.ilm.overwrite: true
+          setup.ilm.enabled: false
+        backup: true
+      notify: Restart Filebeat
+
+    - name: Configure Elasticsearch output
+      ansible.builtin.replace:
+        path: /etc/filebeat/filebeat.yml
+        regexp: '(?m)^output\.elasticsearch:\n(?:^[ \t].*\n|^\n)*'
+        replace: |
+          output.elasticsearch:
+            hosts: ["https://{{ wazuh_indexer_host }}:{{ wazuh_indexer_port }}"]
+            username: "{{ wazuh_indexer_user }}"
+            password: {{ wazuh_indexer_password | to_json }}
+            ssl.certificate_authorities: ["{{ wazuh_indexer_ca_path }}"]
+            ssl.verification_mode: full
+        backup: true
+      no_log: true
+      notify: Restart Filebeat
+
+    - name: Document seccomp workaround for observed thread-creation crash
+      ansible.builtin.blockinfile:
+        path: /etc/filebeat/filebeat.yml
+        marker: "# {mark} ANSIBLE SECCOMP WORKAROUND"
+        block: |
+          # Workaround for observed pthread_create failure on the edge VM.
+          # Review before production use because this disables Filebeat's seccomp filter.
+          seccomp.enabled: false
+        backup: true
+      notify: Restart Filebeat
+
+    - name: Validate Filebeat configuration
+      ansible.builtin.command:
+        cmd: filebeat test config -e
+      changed_when: false
+
+    - name: Protect Filebeat configuration containing indexer credentials
+      ansible.builtin.file:
+        path: /etc/filebeat/filebeat.yml
+        owner: root
+        group: root
+        mode: "0600"
+
+    - name: Enable and start Filebeat
+      ansible.builtin.systemd:
+        name: filebeat
+        enabled: true
+        state: started
+
+  handlers:
+    - name: Restart Filebeat
+      ansible.builtin.systemd:
+        name: filebeat
+        state: restarted
