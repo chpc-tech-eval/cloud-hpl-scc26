@@ -1,0 +1,440 @@
+// @ts-expect-error This is an internal module
+import * as config from "astro:config/client";
+import { toFallbackType } from "../core/app/common.js";
+import { toRoutingStrategy } from "../core/app/entrypoints/index.js";
+import { IncorrectStrategyForI18n, InvalidI18nMiddlewareConfiguration } from "../core/errors/errors-data.js";
+import { AstroError } from "../core/errors/index.js";
+import * as I18nInternals from "../i18n/index.js";
+import { normalizeTheLocale as normalizeTheLocaleInternal, pathHasLocale as pathHasLocaleInternal } from "../i18n/path.js";
+const { trailingSlash, site, i18n, build } = config;
+const { format } = build;
+const isBuild = import.meta.env.PROD;
+const { defaultLocale, locales, domains, fallback, routing } = i18n;
+const base = import.meta.env.BASE_URL;
+let strategy = toRoutingStrategy(routing, domains);
+let fallbackType = toFallbackType(routing);
+const noop = (method) => function() {
+	throw new AstroError({
+		...IncorrectStrategyForI18n,
+		message: IncorrectStrategyForI18n.message(method)
+	});
+};
+/**
+* @param locale A locale
+* @param path An optional path to add after the `locale`.
+* @param options Customise the generated path
+*
+* Returns a _relative_ path with passed locale.
+*
+* ## Errors
+*
+* Throws an error if the locale doesn't exist in the list of locales defined in the configuration.
+*
+* ## Examples
+*
+* ```js
+* import { getRelativeLocaleUrl } from "astro:i18n";
+* getRelativeLocaleUrl("es"); // /es
+* getRelativeLocaleUrl("es", "getting-started"); // /es/getting-started
+* getRelativeLocaleUrl("es_US", "getting-started", { prependWith: "blog" }); // /blog/es-us/getting-started
+* getRelativeLocaleUrl("es_US", "getting-started", { prependWith: "blog", normalizeLocale: false }); // /blog/es_US/getting-started
+* ```
+*/
+export const getRelativeLocaleUrl = (locale, path, options) => I18nInternals.getLocaleRelativeUrl({
+	locale,
+	path,
+	base,
+	trailingSlash,
+	format,
+	defaultLocale,
+	locales,
+	strategy,
+	domains,
+	...options
+});
+/**
+*
+* @param locale A locale
+* @param path An optional path to add after the `locale`.
+* @param options Customise the generated path
+*
+* Returns an absolute path with the passed locale. The behaviour is subject to change based on `site` configuration.
+* If _not_ provided, the function will return a _relative_ URL.
+*
+* ## Errors
+*
+* Throws an error if the locale doesn't exist in the list of locales defined in the configuration.
+*
+* ## Examples
+*
+* If `site` is `https://example.com`:
+*
+* ```js
+* import { getAbsoluteLocaleUrl } from "astro:i18n";
+* getAbsoluteLocaleUrl("es"); // https://example.com/es
+* getAbsoluteLocaleUrl("es", "getting-started"); // https://example.com/es/getting-started
+* getAbsoluteLocaleUrl("es_US", "getting-started", { prependWith: "blog" }); // https://example.com/blog/es-us/getting-started
+* getAbsoluteLocaleUrl("es_US", "getting-started", { prependWith: "blog", normalizeLocale: false }); // https://example.com/blog/es_US/getting-started
+* ```
+*/
+export const getAbsoluteLocaleUrl = (locale, path, options) => I18nInternals.getLocaleAbsoluteUrl({
+	locale,
+	path,
+	base,
+	trailingSlash,
+	format,
+	site,
+	defaultLocale,
+	locales,
+	strategy,
+	domains,
+	isBuild,
+	...options
+});
+/**
+* @param path An optional path to add after the `locale`.
+* @param options Customise the generated path
+*
+* Works like `getRelativeLocaleUrl` but it emits the relative URLs for ALL locales:
+*/
+export const getRelativeLocaleUrlList = (path, options) => I18nInternals.getLocaleRelativeUrlList({
+	base,
+	path,
+	trailingSlash,
+	format,
+	defaultLocale,
+	locales,
+	strategy,
+	domains,
+	...options
+});
+/**
+* @param path An optional path to add after the `locale`.
+* @param options Customise the generated path
+*
+* Works like `getAbsoluteLocaleUrl` but it emits the absolute URLs for ALL locales:
+*/
+export const getAbsoluteLocaleUrlList = (path, options) => I18nInternals.getLocaleAbsoluteUrlList({
+	site,
+	base,
+	path,
+	trailingSlash,
+	format,
+	defaultLocale,
+	locales,
+	strategy,
+	domains,
+	isBuild,
+	...options
+});
+/**
+* A function that return the `path` associated to a locale (defined as code). It's particularly useful in case you decide
+* to use locales that are broken down in paths and codes.
+*
+* @param locale The code of the locale
+* @returns The path associated to the locale
+*
+* ## Example
+*
+* ```js
+* // astro.config.mjs
+*
+* export default defineConfig({
+* 	i18n: {
+* 		locales: [
+* 			{ codes: ["it", "it-VT"], path: "italiano" },
+* 			"es"
+* 		]
+* 	}
+* })
+* ```
+*
+* ```js
+* import { getPathByLocale } from "astro:i18n";
+* getPathByLocale("it"); // returns "italiano"
+* getPathByLocale("it-VT"); // returns "italiano"
+* getPathByLocale("es"); // returns "es"
+* ```
+*/
+export const getPathByLocale = (locale) => I18nInternals.getPathByLocale(locale, locales);
+/**
+* A function that returns the preferred locale given a certain path. This is particularly useful if you configure a locale using
+* `path` and `codes`. When you define multiple `code`, this function will return the first code of the array.
+*
+* Astro will treat the first code as the one that the user prefers.
+*
+* @param path The path that maps to a locale
+* @returns The path associated to the locale
+*
+* ## Example
+*
+* ```js
+* // astro.config.mjs
+*
+* export default defineConfig({
+* 	i18n: {
+* 		locales: [
+* 			{ codes: ["it-VT", "it"], path: "italiano" },
+* 			"es"
+* 		]
+* 	}
+* })
+* ```
+*
+* ```js
+* import { getLocaleByPath } from "astro:i18n";
+* getLocaleByPath("italiano"); // returns "it-VT" because that's the first code configured
+* getLocaleByPath("es"); // returns "es"
+* ```
+*/
+export const getLocaleByPath = (path) => I18nInternals.getLocaleByPath(path, locales);
+/**
+* A function that can be used to check if the current path contains a configured locale.
+*
+* @param path The path that maps to a locale
+* @returns Whether the `path` has the locale
+*
+* ## Example
+*
+* Given the following configuration:
+*
+* ```js
+* // astro.config.mjs
+*
+* export default defineConfig({
+* 	i18n: {
+* 		locales: [
+* 			{ codes: ["it-VT", "it"], path: "italiano" },
+* 			"es"
+* 		]
+* 	}
+* })
+* ```
+*
+* Here's some use cases:
+*
+* ```js
+* import { pathHasLocale } from "astro:i18n";
+* pathHasLocale("italiano"); // returns `true`
+* pathHasLocale("es"); // returns `true`
+* pathHasLocale("it-VT"); // returns `false`
+* ```
+*/
+export const pathHasLocale = (path) => pathHasLocaleInternal(path, locales);
+/**
+*
+* This function returns a redirect to the default locale configured in the
+*
+* @param {APIContext} context The context passed to the middleware
+* @param {ValidRedirectStatus?} statusCode An optional status code for the redirect.
+*/
+export let redirectToDefaultLocale;
+if (i18n?.routing === "manual") {
+	redirectToDefaultLocale = I18nInternals.redirectToDefaultLocale({
+		base,
+		trailingSlash,
+		format,
+		defaultLocale,
+		locales,
+		strategy,
+		domains,
+		fallback,
+		fallbackType
+	});
+} else {
+	redirectToDefaultLocale = noop("redirectToDefaultLocale");
+}
+/**
+*
+* Use this function to return a 404 when:
+* - the current path isn't a root. e.g. / or /<base>
+* - the URL doesn't contain a locale
+*
+* When a `Response` is passed, the new `Response` emitted by this function will contain the same headers of the original response.
+*
+* @param {APIContext} context The context passed to the middleware
+* @param {Response?} response An optional `Response` in case you're handling a `Response` coming from the `next` function.
+*
+*/
+export let notFound;
+if (i18n?.routing === "manual") {
+	notFound = I18nInternals.notFound({
+		base,
+		trailingSlash,
+		format,
+		defaultLocale,
+		locales,
+		strategy,
+		domains,
+		fallback,
+		fallbackType
+	});
+} else {
+	notFound = noop("notFound");
+}
+/**
+* Checks whether the current URL contains a configured locale. Internally, this function will use `APIContext#url.pathname`
+*
+* @param {APIContext} context The context passed to the middleware
+*/
+export let requestHasLocale;
+if (i18n?.routing === "manual") {
+	requestHasLocale = I18nInternals.requestHasLocale(locales);
+} else {
+	requestHasLocale = noop("requestHasLocale");
+}
+/**
+* Allows to use the built-in fallback system of Astro
+*
+* @param {APIContext} context The context passed to the middleware
+* @param {Promise<Response>} response An optional `Response` in case you're handling a `Response` coming from the `next` function.
+*/
+export let redirectToFallback;
+if (i18n?.routing === "manual") {
+	redirectToFallback = I18nInternals.redirectToFallback({
+		base,
+		trailingSlash,
+		format,
+		defaultLocale,
+		locales,
+		strategy,
+		domains,
+		fallback,
+		fallbackType
+	});
+} else {
+	redirectToFallback = noop("useFallback");
+}
+/**
+* @param {AstroConfig['i18n']['routing']} customOptions
+*
+* A function that allows you to programmatically create the Astro i18n middleware.
+*
+* This is useful when you still want to use the default i18n logic, but add only a few exceptions to your website.
+*
+* ## Examples
+*
+* ```js
+* // middleware.js
+* import { middleware } from "astro:i18n";
+* import { sequence, defineMiddleware } from "astro:middleware";
+*
+* const customLogic = defineMiddleware(async (context, next) => {
+*   const response = await next();
+*
+*   // Custom logic after resolving the response.
+*   // It's possible to catch the response coming from Astro i18n middleware.
+*
+*   return response;
+* });
+*
+* export const onRequest = sequence(customLogic, middleware({
+* 	prefixDefaultLocale: true,
+* 	redirectToDefaultLocale: false
+* }))
+*
+* ```
+*/
+export let middleware;
+if (i18n?.routing === "manual") {
+	middleware = (customOptions) => {
+		if (customOptions.prefixDefaultLocale === false && customOptions.redirectToDefaultLocale === true) {
+			throw new AstroError(InvalidI18nMiddlewareConfiguration);
+		}
+		strategy = toRoutingStrategy(customOptions, {});
+		fallbackType = toFallbackType(customOptions);
+		const manifest = {
+			...i18n,
+			strategy,
+			domainLookupTable: {},
+			fallbackType,
+			fallback: i18n.fallback,
+			domains: i18n.domains
+		};
+		return I18nInternals.createMiddleware(manifest, base, trailingSlash, format);
+	};
+} else {
+	middleware = noop("middleware");
+}
+/**
+* Replaces underscores (`_`) with hyphens (`-`) in the given locale before
+* returning a lowercase version.
+*
+* @param {string} locale A locale code to normalize.
+* @returns {string} The normalized locale.
+*
+* ## Example
+*
+* ```js
+* import { normalizeTheLocale } from "astro:i18n";
+* normalizeTheLocale("it_VT") // returns `it-vt`
+* ```
+*/
+export const normalizeTheLocale = normalizeTheLocaleInternal;
+/**
+* Retrieves the configured locale codes for each locale defined in your
+* configuration. When multiple codes are associated to a locale, only the
+* first one will be added to the array.
+*
+* @param {Locales} locales The configured locales.
+* @returns {string[]} The configured locales codes.
+*
+* ## Example
+*
+* Given the following configuration:
+*
+* ```js
+* // astro.config.mjs
+*
+* export default defineConfig({
+* 	i18n: {
+* 		locales: [
+* 			{ codes: ["it-VT", "it"], path: "italiano" },
+* 			"es"
+* 		]
+* 	}
+* })
+* ```
+*
+* Here's a use case:
+*
+* ```js
+* import { i18n } from "astro:config/client";
+* import { toCodes } from "astro:i18n";
+* toCodes(i18n.locales); // ["it-VT", "es"]
+* ```
+*/
+export const toCodes = I18nInternals.toCodes;
+/**
+* Retrieves the configured locale paths for each locale defined in your
+* configuration.
+*
+* @param {Locales} locales The configured locales.
+* @returns {string[]} The configured locales paths.
+*
+* ## Example
+*
+* Given the following configuration:
+*
+* ```js
+* // astro.config.mjs
+*
+* export default defineConfig({
+* 	i18n: {
+* 		locales: [
+* 			{ codes: ["it-VT", "it"], path: "italiano" },
+* 			"es"
+* 		]
+* 	}
+* })
+* ```
+*
+* Here's a use case:
+*
+* ```js
+* import { i18n } from "astro:config/client";
+* import { toPaths } from "astro:i18n";
+* toPaths(i18n.locales); // ["italiano", "es"]
+* ```
+*/
+export const toPaths = I18nInternals.toPaths;

@@ -1,0 +1,40 @@
+export { fontProviders } from "../assets/fonts/providers/index.js";
+export { mergeConfig } from "../core/config/merge.js";
+export { validateConfig } from "../core/config/validate.js";
+export { envField } from "../env/config.js";
+export { defineConfig, getViteConfig } from "./index.js";
+export { sessionDrivers } from "../core/session/drivers.js";
+export { svgoOptimizer } from "../assets/svg/svgo.js";
+export { logHandlers } from "../core/logger/handlers.js";
+/**
+* Return the configuration needed to use the Sharp-based image service
+*/
+export function sharpImageService(config = {}) {
+	return {
+		entrypoint: "astro/assets/services/sharp",
+		config
+	};
+}
+/**
+* Return the configuration needed to use the passthrough image service. This image services does not perform
+* any image transformations, and is mainly useful when your platform does not support other image services, or you are
+* not using Astro's built-in image processing.
+* See: https://docs.astro.build/en/guides/images/#configure-no-op-passthrough-service
+*/
+export function passthroughImageService() {
+	return {
+		entrypoint: "astro/assets/services/noop",
+		config: {}
+	};
+}
+/**
+* Return the configuration needed to use the built-in in-memory LRU cache provider.
+* This is a runtime-agnostic provider suitable for single-instance deployments.
+*/
+export function memoryCache(config = {}) {
+	return {
+		name: "memory",
+		entrypoint: "astro/cache/memory",
+		config
+	};
+}

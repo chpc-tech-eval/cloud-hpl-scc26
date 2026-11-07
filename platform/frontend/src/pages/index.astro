@@ -1,0 +1,73 @@
+---
+// Astro frontmatter (runs on server build/SSR if enabled, or static)
+const teamName = "Team Quantum POC";
+---
+
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>{teamName} - Student Platform</title>
+  </head>
+  <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px;">
+    <h1>{teamName}</h1>
+    <p>Welcome to the Week-3 Student Platform POC.</p>
+
+    <div id="login-section" style="margin-top: 20px; padding: 15px; border: 1px solid #ccc;">
+      <h3>Authenticated Login</h3>
+      <input type="text" id="username" placeholder="Enter team/user name" style="padding: 8px; width: 60%;" />
+      <button id="login-btn" style="padding: 8px 15px;">Login / Register</button>
+    </div>
+
+    <div id="profile-section" style="margin-top: 20px; padding: 15px; border: 1px solid #00aa00; display: none;">
+      <h3>Profile & Status Home</h3>
+      <p id="welcome-msg"></p>
+      <p><strong>Platform Uptime:</strong> <span id="uptime">-</span> seconds</p>
+      <button id="logout-btn" style="padding: 8px 15px; background: #aa0000; color: white;">Logout</button>
+    </div>
+
+    <script>
+      const loginBtn = document.getElementById('login-btn');
+      const logoutBtn = document.getElementById('logout-btn');
+      const loginSection = document.getElementById('login-section');
+      const profileSection = document.getElementById('profile-section');
+      const usernameInput = document.getElementById('username');
+      const welcomeMsg = document.getElementById('welcome-msg');
+      const uptimeSpan = document.getElementById('uptime');
+
+      loginBtn.addEventListener('click', async () => {
+        const username = usernameInput.value.trim();
+        if (!username) return alert('Please enter a username');
+
+        try {
+          const res = await window.fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username })
+          });
+          const data = await res.json();
+
+          if (data.success) {
+            loginSection.style.display = 'none';
+            profileSection.style.display = 'block';
+            welcomeMsg.innerText = `Logged in as: ${data.user.username} (ID: ${data.user.id})`;
+
+            // Fetch platform status
+            const statusRes = await window.fetch('/api/status');
+            const statusData = await statusRes.json();
+            uptimeSpan.innerText = Math.round(statusData.uptime);
+          } else {
+            alert('Login failed');
+          }
+        } catch (err) {
+          alert('Error connecting to backend API');
+        }
+      });
+
+      logoutBtn.addEventListener('click', () => {
+        profileSection.style.display = 'none';
+        loginSection.style.display = 'block';
+        usernameInput.value = '';
+      });
+    </script>
+  </body>
+</html>

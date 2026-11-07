@@ -1,0 +1,53 @@
+import { builtinDrivers } from "unstorage";
+import { fileURLToPath } from "node:url";
+function isUnstorageDriver(driver) {
+	return driver in builtinDrivers;
+}
+export function normalizeSessionDriverConfig(driver, options) {
+	if (typeof driver !== "string") {
+		return {
+			entrypoint: driver.entrypoint instanceof URL ? fileURLToPath(driver.entrypoint) : driver.entrypoint,
+			config: driver.config
+		};
+	}
+	// The fs driver cannot be bundled so we special case it
+	if ([
+		"fs",
+		"fs-lite",
+		"fsLite"
+	].includes(driver)) {
+		return {
+			entrypoint: builtinDrivers.fsLite,
+			config: {
+				base: ".astro/session",
+				...options
+			}
+		};
+	}
+	if (isUnstorageDriver(driver)) {
+		return {
+			entrypoint: builtinDrivers[driver],
+			config: options
+		};
+	}
+	return {
+		entrypoint: driver,
+		config: options
+	};
+}
+export function sessionConfigToManifest(config) {
+	if (config === false) {
+		return undefined;
+	}
+	const sessionDriver = config?.driver;
+	if (!config || !sessionDriver) {
+		return undefined;
+	}
+	const driver = normalizeSessionDriverConfig(sessionDriver);
+	return {
+		driver: driver.entrypoint,
+		options: driver.config,
+		cookie: config.cookie,
+		ttl: config.ttl
+	};
+}

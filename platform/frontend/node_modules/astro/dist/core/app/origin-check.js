@@ -1,0 +1,90 @@
+import { defineMiddleware } from "../middleware/defineMiddleware.js";
+/**
+* Content types that can be passed when sending a request via a form
+*
+* https://developer.mozilla.org/en-US/docs/Web/API/HTMLFormElement/enctype
+* @private
+*/
+const FORM_CONTENT_TYPES = [
+	"application/x-www-form-urlencoded",
+	"multipart/form-data",
+	"text/plain"
+];
+// Note: TRACE is unsupported by undici/Node.js
+const SAFE_METHODS = [
+	"GET",
+	"HEAD",
+	"OPTIONS"
+];
+/**
+* Determines whether a request should be rejected because it is a cross-site
+* submission for a route rendered on demand.
+*
+* This encapsulates the shared logic used by both the origin-check middleware
+* and the Astro Actions dispatch, so the check is applied consistently
+* regardless of where the request is handled.
+*
+* @private
+*/
+export function isForbiddenCrossOriginRequest(request, url, isPrerendered) {
+	// Prerendered pages should be excluded
+	if (isPrerendered) {
+		return false;
+	}
+	// Safe methods don't require origin check
+	if (SAFE_METHODS.includes(request.method)) {
+		return false;
+	}
+	// Only requests a cross-site HTML form can send are checked. Other content
+	// types (e.g. `application/json`) trigger a CORS preflight in browsers.
+	// TODO: remove in Astro 8, so every unsafe request goes through the
+	// `Sec-Fetch-Site`/`Origin` check below. https://github.com/withastro/astro/issues/18267
+	const contentType = request.headers.get("content-type");
+	if (contentType && !hasFormLikeHeader(contentType)) {
+		return false;
+	}
+	switch (request.headers.get("sec-fetch-site")) {
+		case "":
+		case null: break;
+		case "same-origin":
+		case "none": return false;
+		default: return true;
+	}
+	const origin = request.headers.get("origin");
+	if (!origin) {
+		return false;
+	}
+	return origin !== url.origin;
+}
+/**
+* Builds the 403 response returned when a cross-site submission is rejected.
+*
+* @private
+*/
+export function createCrossOriginForbiddenResponse(request) {
+	return new Response(`Cross-site ${request.method} form submissions are forbidden`, { status: 403 });
+}
+/**
+* Returns middleware that rejects cross-origin form submissions.
+*
+* @private
+*/
+export function createOriginCheckMiddleware() {
+	return defineMiddleware((context, next) => {
+		const { request, url, isPrerendered } = context;
+		if (isForbiddenCrossOriginRequest(request, url, isPrerendered)) {
+			return createCrossOriginForbiddenResponse(request);
+		}
+		return next();
+	});
+}
+export function hasFormLikeHeader(contentType) {
+	if (contentType) {
+		for (const FORM_CONTENT_TYPE of FORM_CONTENT_TYPES) {
+			if (contentType.toLowerCase().includes(FORM_CONTENT_TYPE)) {
+				return true;
+			}
+		}
+	}
+	return false;
+}

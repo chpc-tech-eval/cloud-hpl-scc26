@@ -1,0 +1,1 @@
+import "./langs-bundle-full-C2VQ9nxh.mjs";
