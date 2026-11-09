@@ -1,13 +1,6 @@
 {
   "name": "student-platform-frontend",
   "type": "module",
-  "version": "1.0.0",
-  "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview"
-  },
-  "dependencies": {
-    "astro": "^7.4.7"
-  }
+  "scripts": { "dev": "astro dev", "build": "astro build" },
+  "dependencies": { "astro": "^4.16.0" }
 }

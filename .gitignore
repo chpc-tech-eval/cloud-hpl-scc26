@@ -9,3 +9,6 @@ clouds.yaml
 *.crt.private
 secrets-private/infrastructure/ansible/inventories/private/hosts.yml
 infrastructure/ansible/inventories/private/hosts.yml
+node_modules/
+dist/
+secrets-local/
