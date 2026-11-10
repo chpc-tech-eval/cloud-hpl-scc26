@@ -48,6 +48,6 @@ spec:
         name: data
       spec:
         accessModes: ["ReadWriteOnce"]
-        storageClassName: <your-cinder-storage-class>
+        storageClassName: csi-cinder-sc-retain
         resources:
           requests: { storage: 5Gi }
