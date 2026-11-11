@@ -1,0 +1,6 @@
+{
+  "name": "student-platform-frontend",
+  "type": "module",
+  "scripts": { "dev": "astro dev", "build": "astro build" },
+  "dependencies": { "astro": "^4.16.0" }
+}

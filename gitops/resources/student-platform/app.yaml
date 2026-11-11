@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: student-platform
+  namespace: student-platform
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: student-platform }
+  template:
+    metadata:
+      labels: { app: student-platform }
+    spec:
+      # imagePullSecrets:            # uncomment only if the GHCR package is private
+      #   - name: ghcr-pull
+      containers:
+        - name: app
+          image: ghcr.io/chpc-tech-eval/cloud-hpl-scc26/student-platform@sha256:7ff78949b2148320569ec3ad978a4a7569bde169dd34c651e9400a2d483fe26e
+          ports:
+            - containerPort: 8080
+          env:
+            - { name: TEAM_NAME, value: "CPUT CD Spears" }
+            - { name: TEAM_SLUG, value: "cput-cd-spears" }
+            - { name: GIT_SHA, value: "" }
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef: { name: student-platform-secrets, key: DATABASE_URL }
+            - name: REGISTRATION_CODE
+              valueFrom:
+                secretKeyRef: { name: student-platform-secrets, key: REGISTRATION_CODE }
+          livenessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 10
+          readinessProbe:
+            httpGet: { path: /ready, port: 8080 }
+            initialDelaySeconds: 5
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: student-platform
+  namespace: student-platform
+spec:
+  selector: { app: student-platform }
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: student-platform
+  namespace: student-platform
+  annotations:
+    cert-manager.io/cluster-issuer: ClusterIssuer
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts: [" ingress-test.local"]
+      secretName: student-platform-tls
+  rules:
+    - host:  ingress-test.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: student-platform
+                port: { number: 80 }

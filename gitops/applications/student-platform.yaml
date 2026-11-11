@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: student-platform
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/chpc-tech-eval/cloud-hpl-scc26.git
+    targetRevision: dev
+    path: gitops/resources/student-platform
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: student-platform
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
