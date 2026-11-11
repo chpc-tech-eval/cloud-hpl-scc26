@@ -15,13 +15,13 @@ spec:
       #   - name: ghcr-pull
       containers:
         - name: app
-          image: ghcr.io/chpc-tech-eval/cloud-hpl-scc26/student-platform@sha256:7ff78949b2148320569ec3ad978a4a7569bde169dd34c651e9400a2d483fe26e
+          image: ghcr.io/chpc-tech-eval/cloud-hpl-scc26/student-platform@sha256:dda2796eebb8ee89f80fe2b679f22c9cac2ee85ccf12b6593cf1cde5d0245bb6
           ports:
             - containerPort: 8080
           env:
             - { name: TEAM_NAME, value: "CPUT CD Spears" }
             - { name: TEAM_SLUG, value: "cput-cd-spears" }
-            - { name: GIT_SHA, value: "" }
+            - { name: GIT_SHA, value: " 4cdf177" }
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef: { name: student-platform-secrets, key: DATABASE_URL }
@@ -57,14 +57,14 @@ metadata:
   name: student-platform
   namespace: student-platform
   annotations:
-    cert-manager.io/cluster-issuer: ClusterIssuer
+    cert-manager.io/cluster-issuer: ingress-test-selfsigned
 spec:
   ingressClassName: traefik
   tls:
-    - hosts: [" ingress-test.local"]
+    - hosts: ["student-platform.local"]
       secretName: student-platform-tls
   rules:
-    - host:  ingress-test.local
+    - host: student-platform.local
       http:
         paths:
           - path: /
