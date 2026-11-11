@@ -1,0 +1,7 @@
+---
+- name: Install Kubernetes Prerequisites
+  hosts: control_plane:workers
+  become: true
+  roles:
+    - containerd
+    - kube-prereqs

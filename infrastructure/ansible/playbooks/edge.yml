@@ -1,0 +1,113 @@
+---
+- name: Configure Edge Access, DNS, and Firewall
+  hosts: edge
+  become: yes
+  tasks:
+    - name: Install required infrastructure packages
+      dnf:
+        name: ['wireguard-tools', 'nftables', 'podman']
+        state: present
+      tags: ['wireguard', 'firewall', 'pihole']
+
+    - name: Enable IPv4 forwarding for VPN routing
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        state: present
+        sysctl_set: yes
+      tags: firewall
+
+    - name: Configure nftables ruleset for VPN NAT
+      copy:
+        dest: /etc/sysconfig/nftables.conf
+        content: |
+          flush ruleset
+          table inet filter {
+            chain input {
+              type filter hook input priority 0; policy accept;
+              udp dport 51820 accept
+            }
+            chain forward {
+              type filter hook forward priority 0; policy accept;
+            }
+            chain output {
+              type filter hook output priority 0; policy accept;
+            }
+          }
+          table ip nat {
+            chain postrouting {
+              type nat hook postrouting priority 100; policy accept;
+              oifname "eth0" masquerade
+            }
+          }
+      tags: firewall
+
+    - name: Enable and restart nftables
+      systemd:
+        name: nftables
+        enabled: yes
+        state: restarted
+      tags: firewall
+
+    - name: Generate WireGuard server private key
+      shell: wg genkey
+      register: server_privkey
+      tags: wireguard
+
+    - name: Generate WireGuard client private key
+      shell: wg genkey
+      register: client_privkey
+      tags: wireguard
+
+    - name: Derive public keys
+      shell: echo "{{ item }}" | wg pubkey
+      loop:
+        - "{{ server_privkey.stdout }}"
+        - "{{ client_privkey.stdout }}"
+      register: pubkeys
+      tags: wireguard
+
+    - name: Configure WireGuard server interface (wg0)
+      copy:
+        dest: /etc/wireguard/wg0.conf
+        mode: '0600'
+        content: |
+          [Interface]
+          Address = 10.99.0.1/24
+          ListenPort = 51820
+          PrivateKey = {{ server_privkey.stdout }}
+          
+          [Peer]
+          PublicKey = {{ pubkeys.results[1].stdout }}
+          AllowedIPs = 10.99.0.2/32
+      tags: wireguard
+
+    - name: Enable and start WireGuard service
+      systemd:
+        name: wg-quick@wg0
+        enabled: yes
+        state: restarted
+      tags: wireguard
+
+    - name: Deploy Pi-hole container via Podman
+      shell: |
+        podman run -d --name pihole --network host --replace \
+          -e TZ="Africa/Johannesburg" \
+          -e WEBPASSWORD="admin" \
+          docker.io/pihole/pihole:latest
+      tags: pihole
+
+    - name: Output Client VPN Configuration
+      debug:
+        msg: |
+          SAVE THIS CONFIGURATION TO YOUR WORKSTATION:
+          [Interface]
+          Address = 10.99.0.2/24
+          PrivateKey = {{ client_privkey.stdout }}
+
+          [Peer]
+          PublicKey = {{ pubkeys.results[0].stdout }}
+          Endpoint = {{ ansible_host }}:51820
+          AllowedIPs = 10.83.0.0/24, 10.99.0.0/24
+          PersistentKeepalive = 25
+      tags: wireguard

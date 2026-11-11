@@ -1,0 +1,19 @@
+secret:
+  enabled: true
+  hostMount: false
+  create: false
+  filename: cloud.conf
+  name: cloud-config
+
+storageClass:
+  enabled: true
+  delete:
+    isDefault: false
+    allowVolumeExpansion: true
+    parameters: {}
+  retain:
+    isDefault: false
+    allowVolumeExpansion: true
+    parameters: {}
+
+clusterID: "k8s-cp-01"

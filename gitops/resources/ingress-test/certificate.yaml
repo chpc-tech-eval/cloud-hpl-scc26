@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: ingress-test-tls
+  namespace: default
+spec:
+  secretName: ingress-test-tls
+  issuerRef:
+    name: ingress-test-selfsigned
+    kind: ClusterIssuer
+  dnsNames:
+    - ingress-test.local

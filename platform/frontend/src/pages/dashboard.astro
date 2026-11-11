@@ -1,0 +1,44 @@
+---
+---
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard - Student Project Platform</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background:#0f172a; color:#e2e8f0; margin:0; padding:2rem; }
+    .card { background:#1e293b; padding:1.5rem; border-radius:12px; max-width:640px; margin:0 auto 1rem; }
+    button { padding:.5rem 1rem; background:#ef4444; color:white; border:0; border-radius:6px; cursor:pointer; }
+    td { padding:.25rem 1rem .25rem 0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1 id="team">Loading...</h1>
+    <p>Signed in as <strong id="who"></strong> (<span id="uname"></span>)</p>
+    <button id="logout">Log out</button>
+  </div>
+  <div class="card">
+    <h2>Platform status</h2>
+    <table id="status"></table>
+  </div>
+<script is:inline>
+  async function load() {
+    const me = await fetch('/api/me');
+    if (!me.ok) { location.href = '/'; return; }
+    const u = await me.json();
+    document.getElementById('team').textContent = u.team_name + ' (' + u.project_slug + ')';
+    document.getElementById('who').textContent = u.display_name;
+    document.getElementById('uname').textContent = u.username;
+    const s = await (await fetch('/api/status')).json();
+    document.getElementById('status').innerHTML =
+      Object.entries(s).map(([k, v]) => '<tr><td>' + k + '</td><td>' + v + '</td></tr>').join('');
+  }
+  document.getElementById('logout').addEventListener('click', async () => {
+    await fetch('/api/logout', { method: 'POST' });
+    location.href = '/';
+  });
+  load();
+</script>
+</body>
+</html>

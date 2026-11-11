@@ -1,0 +1,14 @@
+all:
+  vars:
+    ansible_user: rocky
+    ansible_ssh_private_key_file: ~/.ssh/scc_key
+  children:
+    edge:
+      hosts:
+        edge-01:
+          ansible_host: <edge-floating-ip>
+    api_lb:
+      hosts:
+        api-lb-01:
+          ansible_host: <api-lb-private-ip>
+          ansible_ssh_common_args: '-o ProxyCommand="ssh -i ~/.ssh/scc_key -W %h:%p rocky@196.24.241.71 -o StrictHostKeyChecking=no" -o StrictHostKeyChecking=no'

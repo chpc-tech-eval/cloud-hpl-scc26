@@ -1,0 +1,6 @@
+external_network_id = "4a39d5bf-15a8-4e87-a14b-a4f2cff8f57d"
+image_id            = "3f6c7f95-e1c7-4473-bd06-f34bdf65eda1"
+flavor_worker       = "7a90de58-a61c-4f9f-acd8-207d544df3e6" // C8.medium 
+flavor_medium       = "7a90de58-a61c-4f9f-acd8-207d544df3e6" // C8.medium
+flavor_small        = "4689db8c-45e8-415b-ad00-c3634201bf8f" // C4.small
+subnet_cidr         = "10.83.0.0/24"

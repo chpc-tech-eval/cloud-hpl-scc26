@@ -1,0 +1,46 @@
+---
+- name: Configure API Load Balancer
+  hosts: api_lb
+  become: yes
+  tasks:
+    - name: Install HAProxy
+      dnf:
+        name: haproxy
+        state: present
+
+    - name: Configure HAProxy for Kubernetes API
+      copy:
+        dest: /etc/haproxy/haproxy.cfg
+        content: |
+          global
+              log /dev/log local0
+              user haproxy
+              group haproxy
+          defaults
+              log global
+              mode tcp
+              timeout connect 5000
+              timeout client  50000
+              timeout server  50000
+          frontend k8s_api
+              bind *:6443
+              default_backend k8s_control_plane
+          backend k8s_control_plane
+              server k8s-cp-01 10.83.0.68:6443 check
+      notify: restart haproxy
+
+    - name: Allow HAProxy to connect to any port (SELinux)
+      command: setsebool -P haproxy_connect_any 1
+      changed_when: false
+
+    - name: Enable and start HAProxy
+      service:
+        name: haproxy
+        state: started
+        enabled: yes
+
+  handlers:
+    - name: restart haproxy
+      service:
+        name: haproxy
+        state: restarted

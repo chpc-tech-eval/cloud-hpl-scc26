@@ -1,0 +1,113 @@
+---
+- name: Bootstrap Argo CD and Sealed Secrets
+  hosts: control_plane
+  become: true
+
+  vars:
+    kubeconfig_path: /etc/kubernetes/admin.conf
+    argocd_namespace: argocd
+    argocd_version: v3.5.6
+    sealed_secrets_version: v0.40.0
+
+  tasks:
+    - name: Check Kubernetes admin configuration
+      ansible.builtin.stat:
+        path: "{{ kubeconfig_path }}"
+      register: admin_config
+
+    - name: Require an initialized Kubernetes cluster
+      ansible.builtin.assert:
+        that:
+          - admin_config.stat.exists
+        fail_msg: >-
+          Kubernetes is not initialized on the control plane.
+          Stop and verify the cluster before installing GitOps.
+
+    - name: Check Kubernetes API connectivity
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - "--kubeconfig={{ kubeconfig_path }}"
+          - get
+          - nodes
+      changed_when: false
+
+    - name: Check whether Argo CD namespace exists
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - "--kubeconfig={{ kubeconfig_path }}"
+          - get
+          - namespace
+          - "{{ argocd_namespace }}"
+      register: argocd_namespace_check
+      changed_when: false
+      failed_when: false
+
+    - name: Create Argo CD namespace if absent
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - "--kubeconfig={{ kubeconfig_path }}"
+          - create
+          - namespace
+          - "{{ argocd_namespace }}"
+      when: argocd_namespace_check.rc != 0
+
+    - name: Install or reconcile Argo CD
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - "--kubeconfig={{ kubeconfig_path }}"
+          - apply
+          - --server-side
+          - --force-conflicts
+          - -n
+          - "{{ argocd_namespace }}"
+          - -f
+          - "https://raw.githubusercontent.com/argoproj/argo-cd/{{ argocd_version }}/manifests/install.yaml"
+      register: argocd_apply
+      changed_when: >-
+        'created' in argocd_apply.stdout or
+        'configured' in argocd_apply.stdout or
+        'serverside-applied' in argocd_apply.stdout
+
+    - name: Wait for Argo CD deployments to become available
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - "--kubeconfig={{ kubeconfig_path }}"
+          - -n
+          - "{{ argocd_namespace }}"
+          - wait
+          - --for=condition=Available
+          - deployment
+          - --all
+          - --timeout=300s
+      changed_when: false
+
+    - name: Install or reconcile Sealed Secrets controller
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - "--kubeconfig={{ kubeconfig_path }}"
+          - apply
+          - -f
+          - "https://github.com/bitnami-labs/sealed-secrets/releases/download/{{ sealed_secrets_version }}/controller.yaml"
+      register: sealed_secrets_apply
+      changed_when: >-
+        'created' in sealed_secrets_apply.stdout or
+        'configured' in sealed_secrets_apply.stdout
+
+    - name: Wait for Sealed Secrets controller to become available
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - "--kubeconfig={{ kubeconfig_path }}"
+          - -n
+          - kube-system
+          - rollout
+          - status
+          - deployment/sealed-secrets-controller
+          - --timeout=300s
+      changed_when: false

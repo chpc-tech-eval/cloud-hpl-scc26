@@ -1,0 +1,59 @@
+---
+- name: Initialize Kubernetes Control Plane
+  hosts: control_plane
+  become: true
+  tasks:
+    - name: Check if cluster is already initialized
+      stat:
+        path: /etc/kubernetes/admin.conf
+      register: kubeadm_conf
+
+    - name: Initialize Kubernetes cluster
+      command: >
+        kubeadm init
+        --control-plane-endpoint="10.83.0.225:6443"
+        --apiserver-advertise-address="10.83.0.68"
+        --pod-network-cidr="10.244.0.0/16"
+        --service-cidr="10.96.0.0/12"
+        --cri-socket="unix:///run/containerd/containerd.sock"
+      when: not kubeadm_conf.stat.exists
+
+    - name: Setup kubeconfig directory for admin user
+      file:
+        path: /home/rocky/.kube
+        state: directory
+        owner: rocky
+        group: rocky
+        mode: '0755'
+
+    - name: Copy admin.conf to user's kube config
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/rocky/.kube/config
+        remote_src: yes
+        owner: rocky
+        group: rocky
+        mode: '0600'
+
+    - name: Generate temporary worker join command
+      command: kubeadm token create --print-join-command
+      register: join_command_raw
+      changed_when: false
+
+    - name: Set join command as fact
+      set_fact:
+        worker_join_command: "{{ join_command_raw.stdout }} --cri-socket unix:///run/containerd/containerd.sock"
+
+- name: Join Worker Nodes
+  hosts: workers
+  become: true
+  serial: 1
+  tasks:
+    - name: Check if worker is already joined
+      stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: kubelet_conf
+
+    - name: Join the Kubernetes cluster
+      command: "{{ hostvars[groups['control_plane'][0]]['worker_join_command'] }}"
+      when: not kubelet_conf.stat.exists

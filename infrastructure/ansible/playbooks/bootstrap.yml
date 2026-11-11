@@ -1,0 +1,23 @@
+---
+- name: Base host bootstrap
+  hosts: all
+  become: yes
+  tasks:
+    - name: Set timezone to Africa/Johannesburg
+      timezone:
+        name: Africa/Johannesburg
+
+    - name: Install chrony and base packages
+      dnf:
+        name: 
+          - chrony
+          - curl
+          - nano
+          - tar
+        state: present
+
+    - name: Ensure chronyd is running and enabled
+      service:
+        name: chronyd
+        state: started
+        enabled: yes

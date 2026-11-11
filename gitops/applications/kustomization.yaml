@@ -1,0 +1,14 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - traefik.yaml
+  - cert-manager.yaml
+  - cert-manager-config.yaml
+  - ingress-test.yaml
+  - cinder-csi.yaml
+  - cinder-csi-config.yaml
+  - monitoring.yaml
+  - monitoring-secrets.yaml
+  - wazuh-secrets.yaml
+  - wazuh-indexer.yaml
+  - wazuh-dashboard.yaml

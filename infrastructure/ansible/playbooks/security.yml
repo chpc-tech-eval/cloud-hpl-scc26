@@ -1,0 +1,77 @@
+---
+- name: Configure Wazuh Manager and Suricata on edge
+  hosts: edge
+  become: true
+
+  tasks:
+    # Wazuh repository
+    - name: Add Wazuh repository
+      ansible.builtin.yum_repository:
+        name: wazuh
+        description: Wazuh repository
+        baseurl: https://packages.wazuh.com/4.x/yum/
+        enabled: true
+        gpgcheck: true
+        gpgkey: https://packages.wazuh.com/key/GPG-KEY-WAZUH
+        priority: 1
+      tags:
+        - wazuh
+
+    # Wazuh Manager
+    - name: Install Wazuh Manager
+      ansible.builtin.dnf:
+        name: wazuh-manager
+        state: present
+      tags:
+        - wazuh
+
+    - name: Enable and start Wazuh Manager
+      ansible.builtin.systemd:
+        name: wazuh-manager
+        enabled: true
+        state: started
+      tags:
+        - wazuh
+
+    # Suricata
+    - name: Enable CRB repository
+      ansible.builtin.command: dnf config-manager --set-enabled crb
+      changed_when: false
+      tags:
+        - suricata
+
+    - name: Install EPEL repository
+      ansible.builtin.dnf:
+        name: epel-release
+        state: present
+      tags:
+        - suricata
+
+    - name: Install Suricata
+      ansible.builtin.dnf:
+        name: suricata
+        state: present
+      tags:
+        - suricata
+
+    - name: Download Suricata rules if missing
+      ansible.builtin.command: suricata-update
+      args:
+        creates: /var/lib/suricata/rules/suricata.rules
+      tags:
+        - suricata
+
+    - name: Validate Suricata configuration
+      ansible.builtin.command:
+        cmd: suricata -T -c /etc/suricata/suricata.yaml
+      changed_when: false
+      tags:
+        - suricata
+
+    - name: Enable and start Suricata
+      ansible.builtin.systemd:
+        name: suricata
+        enabled: true
+        state: started
+      tags:
+        - suricata

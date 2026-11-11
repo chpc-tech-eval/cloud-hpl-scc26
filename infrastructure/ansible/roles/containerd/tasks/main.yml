@@ -1,0 +1,38 @@
+---
+- name: Add Docker repository for containerd
+  get_url:
+    url: https://download.docker.com/linux/centos/docker-ce.repo
+    dest: /etc/yum.repos.d/docker-ce.repo
+
+- name: Install containerd
+  dnf:
+    name: containerd.io
+    state: present
+
+- name: Create containerd configuration directory
+  file:
+    path: /etc/containerd
+    state: directory
+
+- name: Generate default containerd configuration
+  command: containerd config default
+  register: containerd_config
+  changed_when: false
+
+- name: Write default containerd configuration to file
+  copy:
+    content: "{{ containerd_config.stdout }}"
+    dest: /etc/containerd/config.toml
+
+- name: Set SystemdCgroup to true in config.toml
+  replace:
+    path: /etc/containerd/config.toml
+    regexp: 'SystemdCgroup = false'
+    replace: 'SystemdCgroup = true'
+
+- name: Enable and restart containerd service
+  systemd:
+    name: containerd
+    enabled: yes
+    state: restarted
+    daemon_reload: yes
