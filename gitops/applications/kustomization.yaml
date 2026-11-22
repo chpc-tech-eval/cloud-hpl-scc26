@@ -12,3 +12,4 @@ resources:
   - wazuh-secrets.yaml
   - wazuh-indexer.yaml
   - wazuh-dashboard.yaml
+  - student-platform.yaml
